@@ -1,10 +1,4 @@
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-// Regenerates lib/src/ffi/avif_bindings.g.dart from src/avif_image_provider.h.
-//
-// Usage: dart run tool/ffigen.dart
+// Regenerates lib/src/ffi/avif_bindings.g.dart: dart run tool/ffigen.dart
 
 import 'dart:io';
 
@@ -18,12 +12,6 @@ Future<void> main() async {
       dart: DartOutput(
         path: packageRoot.resolve('lib/src/ffi/avif_bindings.g.dart'),
       ),
-      preamble: '''
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-// ignore_for_file: type=lint, unused_field, unused_element''',
     ),
     input: Input(entryPoints: [header], include: (uri) => uri == header),
     visitors: [

@@ -1,7 +1,3 @@
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 import 'dart:async';
 import 'dart:io' show File;
 import 'dart:ui' as ui;
@@ -15,29 +11,18 @@ import 'package:flutter/services.dart';
 
 /// Base class for [ImageProvider]s of AVIF images.
 ///
-/// Still and animated AVIF images are supported. On Android, iOS, macOS,
-/// Linux and Windows the images are decoded with the bundled libavif and
-/// dav1d libraries in a background isolate. On the web, the browser's
-/// built-in AVIF decoder is used.
-///
-/// Other image formats supported by Flutter are decoded by Flutter itself, so
-/// these providers can also be used when the format is not known in advance.
-///
-/// Decoding honors [ResizeImage] (and therefore `cacheWidth` and
-/// `cacheHeight` of the `Image` widget): images are downscaled natively before
-/// conversion to RGBA, which saves both time and memory.
-///
-/// Subclasses implement [loadBytes] to provide the encoded image.
+/// Still and animated images are decoded with the bundled libavif and dav1d
+/// in a background isolate, or by the browser on the web. Other formats are
+/// decoded by Flutter. [ResizeImage] (`cacheWidth`/`cacheHeight`) is honored
+/// by downscaling before the conversion to RGBA.
 abstract class const AvifImageProvider<T extends Object>({
-  /// The scale to place in the [ImageInfo] object of the image.
+  /// The scale of the [ImageInfo].
   final double scale = 1.0,
 }) extends ImageProvider<T> {
-  /// Abstract const constructor.
+  /// Subclasses provide the encoded image through [loadBytes].
   this;
 
-  /// Loads the encoded image for [key].
-  ///
-  /// [chunkEvents] can be used to report loading progress.
+  /// Loads the encoded image; [chunkEvents] can report loading progress.
   @protected
   Future<Uint8List> loadBytes(
     T key,
@@ -79,22 +64,14 @@ abstract class const AvifImageProvider<T extends Object>({
   }
 }
 
-/// Decodes the given [Uint8List] buffer as an AVIF image.
+/// Decodes an AVIF image from memory.
 ///
-/// The provided [bytes] buffer should not be changed after it is provided to
-/// a [MemoryAvifImage]. Like [MemoryImage], two [MemoryAvifImage]s are only
-/// equal if they use the same buffer instance and scale.
-///
-/// See also:
-///
-///  * [AvifImageProvider], for details about decoding.
+/// Like [MemoryImage], two [MemoryAvifImage]s are only equal if they use the
+/// same buffer instance and scale.
 @immutable
-class const MemoryAvifImage(
-  /// The bytes to decode into an image.
-  final Uint8List bytes, {
-  super.scale,
-}) extends AvifImageProvider<MemoryAvifImage> {
-  /// Creates an object that decodes a [Uint8List] buffer as an AVIF image.
+class const MemoryAvifImage(final Uint8List bytes, {super.scale})
+    extends AvifImageProvider<MemoryAvifImage> {
+  /// [bytes] must not be modified afterwards.
   this;
 
   @override
@@ -122,20 +99,11 @@ class const MemoryAvifImage(
       '(${describeIdentity(bytes)}, scale: ${scale.toStringAsFixed(1)})';
 }
 
-/// Decodes the given [File] as an AVIF image.
-///
-/// Not supported on the web.
-///
-/// See also:
-///
-///  * [AvifImageProvider], for details about decoding.
+/// Decodes an AVIF image from a file. Not supported on the web.
 @immutable
-class const FileAvifImage(
-  /// The file to decode into an image.
-  final File file, {
-  super.scale,
-}) extends AvifImageProvider<FileAvifImage> {
-  /// Creates an object that decodes a [File] as an AVIF image.
+class const FileAvifImage(final File file, {super.scale})
+    extends AvifImageProvider<FileAvifImage> {
+  /// [file] is read when the image is resolved.
   this;
 
   @override
@@ -174,16 +142,13 @@ class const FileAvifImage(
 /// The key used by [AssetAvifImage] for the image cache.
 @immutable
 class const AvifAssetBundleKey({
-  /// The bundle from which the image will be obtained.
   required final AssetBundle bundle,
 
-  /// The key to use to obtain the resource from the [bundle].
+  /// The key passed to [AssetBundle.load].
   required final String name,
-
-  /// The scale to place in the [ImageInfo] object of the image.
   required final double scale,
 }) {
-  /// Creates the key for an AVIF asset.
+  /// Usually created by [AssetAvifImage.obtainKey].
   this;
 
   @override
@@ -202,37 +167,25 @@ class const AvifAssetBundleKey({
       '(bundle: $bundle, name: "$name", scale: ${scale.toStringAsFixed(1)})';
 }
 
-/// Decodes an asset as an AVIF image.
+/// Decodes an AVIF image from an asset.
 ///
-/// Like [ExactAssetImage], the asset is used as-is: no resolution-aware asset
-/// variant is chosen, and the [scale] is given explicitly.
-///
-/// See also:
-///
-///  * [AvifImageProvider], for details about decoding.
+/// Like [ExactAssetImage], no resolution-aware asset variant is chosen.
 @immutable
 class const AssetAvifImage(
-  /// The name of the asset.
   final String assetName, {
 
-  /// The bundle from which the image will be obtained.
+  /// Defaults to the bundle of the [ImageConfiguration] (usually the
+  /// `DefaultAssetBundle` of the widget tree), or [rootBundle].
   final AssetBundle? bundle,
 
-  /// The name of the package from which the image is included.
+  /// The package that contains the asset, if any.
   final String? package,
   super.scale,
 }) extends AvifImageProvider<AvifAssetBundleKey> {
-  /// Creates an object that decodes an asset as an AVIF image.
-  ///
-  /// If [bundle] is null, the bundle of the [ImageConfiguration] (usually the
-  /// `DefaultAssetBundle` of the widget tree) or [rootBundle] is used.
-  ///
-  /// The [package] argument must be non-null when fetching an asset that is
-  /// included in a package.
+  /// [assetName] is relative to [package], if given.
   this;
 
-  /// The key to use to obtain the resource from the [bundle]. This is the
-  /// argument passed to [AssetBundle.load].
+  /// The key passed to [AssetBundle.load].
   String get keyName =>
       package == null ? assetName : 'packages/$package/$assetName';
 
@@ -271,25 +224,16 @@ class const AssetAvifImage(
       '(bundle: $bundle, name: "$keyName", scale: ${scale.toStringAsFixed(1)})';
 }
 
-/// Fetches the given URL from the network and decodes it as an AVIF image.
+/// Downloads and decodes an AVIF image.
 ///
-/// On the web, the image is downloaded with the browser's `fetch`, which
-/// (like for [NetworkImage]) requires the server to allow cross-origin
-/// requests (CORS) when the image is hosted on a different origin.
-///
-/// See also:
-///
-///  * [AvifImageProvider], for details about decoding.
+/// On the web, like [NetworkImage], images on other origins require CORS.
 @immutable
 class const NetworkAvifImage(
-  /// The URL from which the image will be fetched.
   final String url, {
   super.scale,
-
-  /// The HTTP headers that will be used to fetch the image from the network.
   final Map<String, String>? headers,
 }) extends AvifImageProvider<NetworkAvifImage> {
-  /// Creates an object that fetches the image at the given URL.
+  /// [headers] are sent with the request.
   this;
 
   @override

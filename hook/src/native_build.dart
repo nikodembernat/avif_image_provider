@@ -1,7 +1,3 @@
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
@@ -15,7 +11,6 @@ import 'package:native_toolchain_c/native_toolchain_c.dart';
 import 'dav1d_config.dart';
 import 'sources.dart';
 
-/// The asset id of the native library, relative to the package.
 const assetName = 'src/ffi/avif_bindings.g.dart';
 
 const _libraryName = 'avif_image_provider';
@@ -32,7 +27,6 @@ enum AsmMode() {
   nasm,
 }
 
-/// A set of sources compiled with the same options.
 class CompileGroup({
   required final String name,
   required final List<Uri> sources,
@@ -119,7 +113,6 @@ class NativeBuild({
     logger.info('Built $_libraryName in ${stopwatch.elapsed}.');
   }
 
-  /// Number of compilations to run in parallel.
   int _jobs() {
     final define = input.userDefines['jobs'];
     if (define is int && define > 0) {
@@ -168,7 +161,6 @@ class NativeBuild({
     }
   }
 
-  /// Finds a usable `nasm` executable for x86 targets.
   Future<File?> _resolveNasm() async {
     if (_arch != Architecture.x64 && _arch != Architecture.ia32) {
       return null;
@@ -238,14 +230,12 @@ class NativeBuild({
       ? const ['/Gy', '/Gw', '/utf-8']
       : const ['-fvisibility=hidden', '-ffunction-sections', '-fdata-sections'];
 
-  /// Flags that silence warnings in third-party code.
   List<String> get _quiet => _msvc ? const ['/w'] : const ['-w'];
 
   List<CompileGroup> _compileGroups(AsmMode asmMode) {
     final asm = asmMode != AsmMode.none;
     final groups = <CompileGroup>[];
 
-    // dav1d.
     final dav1dIncludes = [
       _genDir,
       _dav1d,
@@ -303,7 +293,6 @@ class NativeBuild({
       ),
     );
 
-    // libavif and the wrapper.
     final avifIncludes = [
       _libavif.resolve('include/'),
       _dav1d.resolve('include/'),
@@ -340,7 +329,6 @@ class NativeBuild({
         ),
       );
 
-    // libyuv.
     final yuvDefines = <String, String?>{
       'LIBYUV_DISABLE_SME': null,
       if (_apple || _msvc) 'LIBYUV_DISABLE_SVE': null,
@@ -384,9 +372,7 @@ class NativeBuild({
     return groups;
   }
 
-  /// Splits the groups into chunks of roughly equal size.
-  ///
-  /// Sources with the same file name never end up in the same chunk because
+  /// Sources with the same file name never end up in the same chunk, because
   /// MSVC names object files after the source file.
   List<CompileGroup> _chunk(List<CompileGroup> groups, int jobs) {
     final total = groups.fold(0, (sum, group) => sum + group.sources.length);
@@ -438,7 +424,6 @@ class NativeBuild({
     return dot > 0 ? name.substring(0, dot) : name;
   }
 
-  /// Compiles [chunk] into object files and returns them.
   Future<List<Uri>> _compileChunk(CompileGroup chunk) async {
     // Every chunk gets its own output directory, since the object files are
     // named after their index (Clang) or source file (MSVC).
@@ -510,7 +495,6 @@ class NativeBuild({
       ? path
       : '$path${Platform.pathSeparator}';
 
-  /// Links all [objects] into the shared library and registers it as asset.
   Future<void> _link(List<Uri> objects) async {
     final builder = CBuilder.library(
       name: _libraryName,
@@ -522,7 +506,8 @@ class NativeBuild({
         _ => const [],
       },
       flags: switch (_os) {
-        OS.linux || OS.android => const ['-Wl,--gc-sections', '-Wl,-O1'],
+        OS.linux ||
+        OS.android => const ['-Wl,--gc-sections', '-Wl,-O1', '-Wl,-z,defs'],
         OS.macOS || OS.iOS => const ['-Wl,-dead_strip'],
         _ => const [],
       },
@@ -558,8 +543,7 @@ class NativeBuild({
     ]);
   }
 
-  /// A logger that only forwards errors (such as compiler errors), keeping the
-  /// hook output readable (the compiler command lines are very long).
+  /// Only forwards errors: the compiler command lines are very long.
   Logger _quietLogger() {
     final child = Logger.detached('cbuilder')..level = Level.ALL;
     child.onRecord.listen((record) {
@@ -573,7 +557,6 @@ class NativeBuild({
   }
 }
 
-/// Runs [tasks] with at most [concurrency] of them running at the same time.
 Future<List<T>> _runPool<T>(
   List<Future<T> Function()> tasks,
   int concurrency,

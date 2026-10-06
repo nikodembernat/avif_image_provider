@@ -107,7 +107,7 @@ decode them with the `preferAnimation` option that Flutter always sets.
 
 ## Platform requirements
 
-The build hook compiles about 250 C/C++ files in parallel; the first build
+The build hook compiles about 140 C/C++ files in parallel; the first build
 takes about a minute (per architecture) and is cached afterwards.
 
 | Platform | Requirements                                         |
@@ -161,5 +161,5 @@ library is rebuilt automatically when nasm is installed later.
 
 ## License
 
-BSD 3-Clause. The bundled libraries are licensed under the BSD 2-Clause
+MIT. The bundled libraries are licensed under the BSD 2-Clause
 (libavif, dav1d) and BSD 3-Clause (libyuv) licenses; see `third_party/`.

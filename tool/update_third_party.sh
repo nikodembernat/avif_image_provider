@@ -26,35 +26,46 @@ git -C "$WORK/libyuv" -c advice.detachedHead=false checkout -q "$LIBYUV_REVISION
 rm -rf "$DEST/libavif" "$DEST/dav1d" "$DEST/libyuv"
 mkdir -p "$DEST/libavif/src" "$DEST/dav1d" "$DEST/libyuv/source"
 
-# libavif: decoder-relevant sources only (dav1d is the only AV1 codec).
+# Only the files that hook/src/sources.dart compiles (or that they include).
+LIBAVIF_SOURCES=(
+  alpha.c avif.c codec_dav1d.c colr.c colrconvert.c diag.c exif.c gainmap.c
+  io.c mem.c obu.c properties.c rawdata.c read.c reformat.c
+  reformat_libsharpyuv.c reformat_libyuv.c sampletransform.c scale.c stream.c
+  utils.c
+)
+LIBYUV_SOURCES=(
+  convert.cc convert_argb.cc convert_from_argb.cc cpu_id.cc
+  planar_functions.cc rotate.cc rotate_any.cc rotate_argb.cc rotate_common.cc
+  rotate_gcc.cc rotate_neon.cc rotate_neon64.cc row_any.cc row_common.cc
+  row_gcc.cc row_neon.cc row_neon64.cc row_sve.cc row_win.cc scale.cc
+  scale_any.cc scale_argb.cc scale_common.cc scale_gcc.cc scale_neon.cc
+  scale_neon64.cc scale_uv.cc scale_win.cc
+)
+
 cp "$WORK/libavif/LICENSE" "$DEST/libavif/"
 cp -r "$WORK/libavif/include" "$DEST/libavif/"
 rm -f "$DEST/libavif/include/avif/avif_cxx.h"
-for f in "$WORK"/libavif/src/*.c; do
-  case "$(basename "$f")" in
-    codec_aom.c | codec_avm.c | codec_libgav1.c | codec_rav1e.c | codec_svt.c) ;;
-    *) cp "$f" "$DEST/libavif/src/" ;;
-  esac
+for f in "${LIBAVIF_SOURCES[@]}"; do
+  cp "$WORK/libavif/src/$f" "$DEST/libavif/src/"
 done
 
-# dav1d: library sources for the architectures Flutter targets.
-cp "$WORK/dav1d/COPYING" "$WORK/dav1d/NEWS" "$DEST/dav1d/"
-mkdir -p "$DEST/dav1d/include"
-cp -r "$WORK/dav1d/include/common" "$WORK/dav1d/include/compat" \
-  "$WORK/dav1d/include/dav1d" "$DEST/dav1d/include/"
-rm -f "$DEST/dav1d/include/dav1d/meson.build" "$DEST/dav1d/include/compat/getopt.h"
+cp "$WORK/dav1d/COPYING" "$DEST/dav1d/"
+mkdir -p "$DEST/dav1d/include/compat"
+cp -r "$WORK/dav1d/include/common" "$WORK/dav1d/include/dav1d" "$DEST/dav1d/include/"
+cp -r "$WORK/dav1d/include/compat/msvc" "$DEST/dav1d/include/compat/"
+rm -f "$DEST/dav1d/include/dav1d/meson.build"
 cp -r "$WORK/dav1d/src" "$DEST/dav1d/"
+# RISC-V and LoongArch/PowerPC are built without assembly; RISC-V still needs
+# riscv/cpu.h.
+find "$DEST/dav1d/src/riscv" -type f ! -name cpu.h -delete
+find "$DEST/dav1d/src/riscv" -type d -empty -delete
 rm -rf "$DEST/dav1d/src/loongarch" "$DEST/dav1d/src/ppc" \
   "$DEST/dav1d/src/meson.build" "$DEST/dav1d/src/dav1d.rc.in"
 
-# libyuv: everything except JPEG support, tests and build files.
 cp "$WORK/libyuv/LICENSE" "$WORK/libyuv/PATENTS" "$DEST/libyuv/"
 cp -r "$WORK/libyuv/include" "$DEST/libyuv/"
-for f in "$WORK"/libyuv/source/*.cc; do
-  case "$(basename "$f")" in
-    convert_jpeg.cc | mjpeg_decoder.cc | mjpeg_validate.cc) ;;
-    *) cp "$f" "$DEST/libyuv/source/" ;;
-  esac
+for f in "${LIBYUV_SOURCES[@]}"; do
+  cp "$WORK/libyuv/source/$f" "$DEST/libyuv/source/"
 done
 
 cat > "$DEST/VERSIONS" <<VERSIONS

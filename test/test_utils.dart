@@ -1,7 +1,3 @@
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -34,7 +30,6 @@ final class Pixels._(final int width, final int height, final ByteData _data) {
   }
 }
 
-/// Matches an [Rgba] color whose channels differ by at most [tolerance].
 Matcher isColor(Rgba expected, {int tolerance = 4}) =>
     _ColorMatcher(expected, tolerance);
 
@@ -58,7 +53,6 @@ final class _ColorMatcher(final Rgba expected, final int tolerance)
       description.add('color $expected (±$tolerance)');
 }
 
-/// Checks the colors in the middle of the four quadrants of [pixels].
 void expectQuadrants(
   Pixels pixels, {
   required Rgba topLeft,

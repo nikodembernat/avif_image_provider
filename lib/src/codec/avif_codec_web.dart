@@ -1,7 +1,3 @@
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 import 'dart:js_interop';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -19,10 +15,7 @@ import 'package:flutter/painting.dart';
 // `preferAnimation: true`, which makes Chromium fail to decode still (item
 // based) AVIF images with "Failed to retrieve track metadata".
 
-/// Decodes [bytes] as an AVIF image with the browser's decoder.
-///
-/// [getTargetSize] is called with the intrinsic size of the image to choose
-/// the size of the decoded frames.
+/// Decodes [bytes] with the browser's decoder.
 Future<ui.Codec> instantiateAvifCodec(
   Uint8List bytes, {
   ui.TargetImageSizeCallback? getTargetSize,
@@ -39,7 +32,7 @@ Future<ui.Codec> instantiateAvifCodec(
   });
 }
 
-/// Decodes [bytes] for an [ImageProvider], using the browser's decoder.
+/// Decodes [bytes] with the browser's decoder, honoring [ResizeImage].
 Future<ui.Codec> decodeAvifForProvider(
   Uint8List bytes,
   ImageDecoderCallback decode,
@@ -53,7 +46,7 @@ Future<ui.Codec> decodeAvifForProvider(
   );
 }
 
-/// The versions of the bundled native libraries.
+/// There are no native libraries on the web.
 String get nativeLibraryVersions => 'browser';
 
 bool _isStillAvif(Uint8List bytes) => isIsoBmff(bytes) && !hasMovieBox(bytes);
@@ -97,7 +90,6 @@ Future<ui.Codec> _decodeStill(
   return _StillCodec(await ui_web.createImageFromImageBitmap(bitmap));
 }
 
-/// A codec for a single, already decoded image.
 final class _StillCodec(final ui.Image _image) implements ui.Codec {
   @override
   int get frameCount => 1;

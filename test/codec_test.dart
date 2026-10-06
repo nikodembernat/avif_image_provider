@@ -1,11 +1,6 @@
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 import 'dart:ui' as ui;
 
 import 'package:avif_image_provider/avif_image_provider.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fixtures.dart';
@@ -128,7 +123,6 @@ void main() {
         (red, const Duration(milliseconds: 100)),
         (green, const Duration(milliseconds: 200)),
         (blue, const Duration(milliseconds: 300)),
-        // Wraps around to the first frame.
         (red, const Duration(milliseconds: 100)),
       ];
       for (final (color, duration) in expected) {
@@ -144,11 +138,7 @@ void main() {
       final codec = await codecFor('animated_alpha_loop1.avif');
       addTearDown(codec.dispose);
       expect(codec.frameCount, 2);
-      // Browsers report the repetition count differently, see
-      // https://github.com/w3c/webcodecs/issues/447.
-      if (!kIsWeb) {
-        expect(codec.repetitionCount, 1);
-      }
+      expect(codec.repetitionCount, 1);
       for (final color in [(255, 0, 0, 128), (0, 255, 0, 128)]) {
         final frame = await codec.getNextFrame();
         expect(frame.duration, const Duration(milliseconds: 50));

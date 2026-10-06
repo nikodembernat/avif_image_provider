@@ -1,7 +1,3 @@
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 #include "avif_image_provider.h"
 
 #include <stdio.h>
@@ -15,33 +11,27 @@
 #include "libyuv/scale_argb.h"
 #include "libyuv/version.h"
 
-// Maximum number of decoding threads for animated images.
 #define AVIFIP_MAX_ANIMATION_THREADS 4
-// Number of pixels per decoding thread.
 #define AVIFIP_PIXELS_PER_THREAD (128 * 1024)
 
 struct AvifipDecoder {
   avifDecoder* decoder;
-  // Copy of the encoded bytes; libavif does not copy them.
+  // libavif does not copy the encoded bytes.
   uint8_t* data;
   size_t size;
-  // Requested output size before rotation (0 = intrinsic).
+  // In the orientation of the encoded image; 0 keeps the intrinsic size.
   uint32_t target_width;
   uint32_t target_height;
-  // Region of the decoded image that is displayed (from `clap`).
   avifCropRect crop;
-  // Whether `crop` can be applied to the YUV planes directly (without first
-  // upsampling the chroma planes).
+  // Whether `crop` can be applied to the YUV planes without upsampling the
+  // chroma planes first.
   avifBool crop_in_yuv;
-  // Rotation in libyuv terms (clockwise degrees).
+  // Clockwise degrees, as libyuv expects.
   int rotation;
-  // -1: no mirroring, 0: top/bottom exchanged, 1: left/right exchanged.
+  // -1: none, 0: top/bottom exchanged, 1: left/right exchanged.
   int mirror_axis;
-  // Scratch image used to scale the YUV planes before conversion.
   avifImage* scaled;
-  // Output of the YUV to RGBA conversion.
   avifRGBImage rgb;
-  // Output of rotation/mirroring, if any.
   uint8_t* transformed;
   size_t transformed_size;
   int32_t parsed;
@@ -65,7 +55,6 @@ AvifipDecoder* avifip_decoder_create(void) {
   return d;
 }
 
-// Reads the transform properties of the parsed image.
 static void avifipReadTransforms(AvifipDecoder* d) {
   const avifImage* image = d->decoder->image;
   d->crop.x = 0;
@@ -186,8 +175,6 @@ int32_t avifip_decoder_parse(AvifipDecoder* d,
   } else {
     out_info->repetition_count = decoder->repetitionCount;
   }
-  out_info->bit_depth = decoder->image->depth;
-  out_info->has_alpha = decoder->alphaPresent ? 1 : 0;
   return AVIFIP_RESULT_OK;
 }
 
@@ -197,8 +184,7 @@ int32_t avifip_decoder_set_target_size(AvifipDecoder* d,
   if (d == NULL) {
     return AVIFIP_RESULT_INVALID_ARGUMENT;
   }
-  // The target size is given in display orientation; store it in the
-  // orientation of the encoded image.
+  // The target size is given in display orientation.
   if (avifipSwapsAxes(d)) {
     d->target_width = height;
     d->target_height = width;
@@ -209,7 +195,7 @@ int32_t avifip_decoder_set_target_size(AvifipDecoder* d,
   return AVIFIP_RESULT_OK;
 }
 
-// Returns the size (before rotation) the cropped image is converted at.
+// The size (before rotation) the cropped image is converted at.
 static void avifipOutputSize(const AvifipDecoder* d,
                              uint32_t* width,
                              uint32_t* height) {
@@ -238,12 +224,11 @@ static avifResult avifipEnsureRgb(AvifipDecoder* d,
   rgb->alphaPremultiplied = AVIF_TRUE;
   rgb->chromaUpsampling = AVIF_CHROMA_UPSAMPLING_AUTOMATIC;
   rgb->maxThreads = max_threads;
-  // avifRGBImageAllocatePixels() always produces packed rows.
+  // Allocates packed rows.
   return avifRGBImageAllocatePixels(rgb);
 }
 
-// Converts the current decoder image to RGBA, applying crop and scale.
-// On success, `*pixels`/`*row_bytes`/`*width`/`*height` describe the result.
+// Converts the current image to RGBA, applying crop and scale.
 static avifResult avifipConvert(AvifipDecoder* d,
                                 uint8_t** pixels,
                                 uint32_t* row_bytes,
@@ -272,7 +257,7 @@ static avifResult avifipConvert(AvifipDecoder* d,
   const avifBool scale =
       out_width != d->crop.width || out_height != d->crop.height;
   if (scale && (!cropped || d->crop_in_yuv)) {
-    // Scale the YUV planes; this is much cheaper than converting at full size.
+    // Much cheaper than converting at full size.
     if (d->scaled == NULL) {
       d->scaled = avifImageCreateEmpty();
       if (d->scaled == NULL) {
@@ -316,7 +301,7 @@ static avifResult avifipConvert(AvifipDecoder* d,
     *width = d->crop.width;
     *height = d->crop.height;
     if (scale) {
-      // Rare: unaligned crop combined with downscaling. Scale the RGBA output.
+      // Rare: unaligned crop combined with downscaling.
       const size_t needed = (size_t)out_width * out_height * 4;
       uint8_t* scaled = (uint8_t*)malloc(needed);
       if (scaled == NULL) {
@@ -338,7 +323,6 @@ static avifResult avifipConvert(AvifipDecoder* d,
   return AVIF_RESULT_OK;
 }
 
-// Applies rotation and mirroring to the converted frame.
 static avifResult avifipTransform(AvifipDecoder* d,
                                   uint8_t** pixels,
                                   uint32_t* row_bytes,
@@ -409,7 +393,7 @@ int32_t avifip_decoder_decode_frame(AvifipDecoder* d, AvifipFrame* out_frame) {
   avifDecoder* decoder = d->decoder;
   avifResult result;
   if (decoder->imageIndex + 1 >= decoder->imageCount) {
-    // Wrap around to the first frame (also used for still images).
+    // Also used for still images.
     result = avifDecoderNthImage(decoder, 0);
   } else {
     result = avifDecoderNextImage(decoder);
@@ -435,7 +419,6 @@ int32_t avifip_decoder_decode_frame(AvifipDecoder* d, AvifipFrame* out_frame) {
   out_frame->width = width;
   out_frame->height = height;
   out_frame->row_bytes = row_bytes;
-  out_frame->index = (uint32_t)decoder->imageIndex;
   out_frame->duration_us =
       decoder->imageCount > 1
           ? (int64_t)(decoder->imageTiming.duration * 1e6 + 0.5)

@@ -1,7 +1,3 @@
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 import 'dart:async';
 import 'dart:ffi';
 import 'dart:io' show Platform;
@@ -16,7 +12,6 @@ import 'package:avif_image_provider/src/ffi/avif_bindings.g.dart' as native;
 import 'package:ffi/ffi.dart';
 import 'package:flutter/painting.dart';
 
-/// Maximum number of threads used to decode a single image.
 final int _maxThreads = math.min(Platform.numberOfProcessors, 8);
 
 /// Decodes [bytes] as an AVIF image with the bundled native decoder.
@@ -89,7 +84,6 @@ String _errorMessage(Pointer<native.AvifipDecoder> decoder, int code) => native
     .cast<Utf8>()
     .toDartString();
 
-/// Parses the container. Runs in a background isolate.
 _ParseResult _parse(int decoderAddress, int data, int length, int threads) {
   final decoder = Pointer<native.AvifipDecoder>.fromAddress(decoderAddress);
   final info = calloc<native.AvifipImageInfo>();
@@ -116,7 +110,6 @@ _ParseResult _parse(int decoderAddress, int data, int length, int threads) {
   }
 }
 
-/// Decodes the next frame. Runs in a background isolate.
 _FrameResult _decodeFrame(int decoderAddress) {
   final decoder = Pointer<native.AvifipDecoder>.fromAddress(decoderAddress);
   final frame = calloc<native.AvifipFrame>();
@@ -138,8 +131,8 @@ _FrameResult _decodeFrame(int decoderAddress) {
   }
 }
 
-// The closures passed to Isolate.run are created in these functions so that
-// they only capture integers.
+// Separate functions, so the closures passed to Isolate.run only capture
+// integers.
 Future<_ParseResult> _parseInBackground(
   int decoder,
   int data,
@@ -150,7 +143,6 @@ Future<_ParseResult> _parseInBackground(
 Future<_FrameResult> _decodeFrameInBackground(int decoder) =>
     Isolate.run(() => _decodeFrame(decoder));
 
-/// A native decoder whose container has been parsed.
 final class _ParsedDecoder._(
   final Pointer<native.AvifipDecoder> _decoder, {
   required final int width,
@@ -204,8 +196,6 @@ final class _ParsedDecoder._(
 
   void destroy() => native.avifip_decoder_destroy(_decoder);
 
-  /// Creates a codec that decodes frames at the given size (defaults to the
-  /// intrinsic size).
   ui.Codec toCodec({int? targetWidth, int? targetHeight}) {
     final (outputWidth, outputHeight) = resolveTargetSize(
       width,
@@ -230,10 +220,6 @@ final class _ParsedDecoder._(
   }
 }
 
-/// A [ui.Codec] backed by the native decoder.
-///
-/// Frames are decoded in a background isolate, so decoding never blocks the
-/// UI thread.
 final class _AvifCodec(
   Pointer<native.AvifipDecoder> decoder, {
   @override required final int frameCount,
@@ -245,8 +231,8 @@ final class _AvifCodec(
     _finalizer.attach(this, decoder.cast(), detach: this);
   }
 
-  /// Releases the native decoder if the codec is garbage collected without
-  /// being disposed.
+  // Frees the decoder if the codec is garbage collected without being
+  // disposed.
   static final _finalizer = NativeFinalizer(
     Native.addressOf<
           NativeFunction<Void Function(Pointer<native.AvifipDecoder>)>
@@ -256,7 +242,7 @@ final class _AvifCodec(
 
   Pointer<native.AvifipDecoder>? _decoder = decoder;
 
-  /// The decoded frame of a still image, which is decoded only once.
+  // Still images are decoded only once.
   ui.Image? _stillImage;
   bool _busy = false;
   bool _disposed = false;
@@ -360,6 +346,6 @@ final class _FrameInfo(
   @override final ui.Image image,
 ) implements ui.FrameInfo;
 
-/// The versions of the bundled native libraries.
+/// Versions of the bundled native libraries, for diagnostics.
 String get nativeLibraryVersions =>
     native.avifip_version().cast<Utf8>().toDartString();

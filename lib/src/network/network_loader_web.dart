@@ -1,7 +1,3 @@
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
@@ -9,10 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/painting.dart';
 
-/// Downloads the image at [url] with the browser's `fetch`.
-///
-/// Like [NetworkImage], this requires the server to allow cross-origin
-/// requests (CORS) when the image is hosted on a different origin.
+/// Downloads [url] with `fetch`, which requires CORS for other origins.
 Future<Uint8List> loadNetworkBytes(
   String url,
   Map<String, String>? headers,

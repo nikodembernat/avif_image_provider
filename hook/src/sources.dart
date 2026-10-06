@@ -1,17 +1,12 @@
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 import 'package:code_assets/code_assets.dart';
 
-// Source lists of the vendored libraries, mirroring their upstream build files
-// (dav1d: src/meson.build, libavif: CMakeLists.txt, libyuv: CMakeLists.txt).
+// Subsets of the upstream source lists (dav1d: src/meson.build, libavif and
+// libyuv: CMakeLists.txt) with only what the decoder needs.
 
 List<Uri> _resolve(Uri root, String directory, List<String> files) => [
   for (final file in files) root.resolve('$directory$file'),
 ];
 
-/// dav1d sources compiled once.
 List<Uri> dav1dSources(Uri dav1d) => _resolve(dav1d, 'src/', const [
   'cdf.c',
   'cpu.c',
@@ -40,7 +35,7 @@ List<Uri> dav1dSources(Uri dav1d) => _resolve(dav1d, 'src/', const [
   'wedge.c',
 ]);
 
-/// dav1d sources compiled once per bit depth (8 and 16).
+/// Compiled once per bit depth (8 and 16).
 List<Uri> dav1dTemplateSources(Uri dav1d) => _resolve(dav1d, 'src/', const [
   'cdef_apply_tmpl.c',
   'cdef_tmpl.c',
@@ -57,7 +52,6 @@ List<Uri> dav1dTemplateSources(Uri dav1d) => _resolve(dav1d, 'src/', const [
   'recon_tmpl.c',
 ]);
 
-/// dav1d Arm assembly in GNU assembler syntax.
 List<Uri> dav1dGasSources(Uri dav1d, Architecture architecture) =>
     switch (architecture) {
       Architecture.arm64 => _resolve(dav1d, 'src/arm/64/', const [
@@ -65,7 +59,6 @@ List<Uri> dav1dGasSources(Uri dav1d, Architecture architecture) =>
         'looprestoration_common.S',
         'msac.S',
         'refmvs.S',
-        // 8 bpc.
         'cdef.S',
         'filmgrain.S',
         'ipred.S',
@@ -73,7 +66,6 @@ List<Uri> dav1dGasSources(Uri dav1d, Architecture architecture) =>
         'looprestoration.S',
         'mc.S',
         'mc_dotprod.S',
-        // 16 bpc.
         'cdef16.S',
         'filmgrain16.S',
         'ipred16.S',
@@ -88,14 +80,12 @@ List<Uri> dav1dGasSources(Uri dav1d, Architecture architecture) =>
         'looprestoration_common.S',
         'msac.S',
         'refmvs.S',
-        // 8 bpc.
         'cdef.S',
         'filmgrain.S',
         'ipred.S',
         'loopfilter.S',
         'looprestoration.S',
         'mc.S',
-        // 16 bpc.
         'cdef16.S',
         'filmgrain16.S',
         'ipred16.S',
@@ -107,7 +97,6 @@ List<Uri> dav1dGasSources(Uri dav1d, Architecture architecture) =>
       _ => const [],
     };
 
-/// dav1d x86 assembly in NASM syntax.
 List<Uri> dav1dNasmSources(Uri dav1d) => _resolve(dav1d, 'src/x86/', const [
   'cpuid.asm',
   'msac.asm',
@@ -118,7 +107,6 @@ List<Uri> dav1dNasmSources(Uri dav1d) => _resolve(dav1d, 'src/x86/', const [
   'itx_avx2.asm',
   'cdef_sse.asm',
   'itx_sse.asm',
-  // 8 bpc.
   'cdef_avx512.asm',
   'filmgrain_avx512.asm',
   'ipred_avx512.asm',
@@ -135,7 +123,6 @@ List<Uri> dav1dNasmSources(Uri dav1d) => _resolve(dav1d, 'src/x86/', const [
   'loopfilter_sse.asm',
   'looprestoration_sse.asm',
   'mc_sse.asm',
-  // 16 bpc.
   'cdef16_avx512.asm',
   'filmgrain16_avx512.asm',
   'ipred16_avx512.asm',
@@ -159,7 +146,6 @@ List<Uri> dav1dNasmSources(Uri dav1d) => _resolve(dav1d, 'src/x86/', const [
   'mc16_sse.asm',
 ]);
 
-/// libavif sources (decoder with dav1d and libyuv).
 List<Uri> libavifSources(Uri libavif) => _resolve(libavif, 'src/', const [
   'alpha.c',
   'avif.c',
@@ -182,21 +168,12 @@ List<Uri> libavifSources(Uri libavif) => _resolve(libavif, 'src/', const [
   'scale.c',
   'stream.c',
   'utils.c',
-  'write.c',
 ]);
 
-/// libyuv sources compiled for every architecture.
 List<Uri> libyuvSources(Uri libyuv) => _resolve(libyuv, 'source/', const [
-  'compare.cc',
-  'compare_common.cc',
-  'compare_gcc.cc',
-  'compare_win.cc',
   'convert.cc',
   'convert_argb.cc',
-  'convert_from.cc',
   'convert_from_argb.cc',
-  'convert_to_argb.cc',
-  'convert_to_i420.cc',
   'cpu_id.cc',
   'planar_functions.cc',
   'rotate.cc',
@@ -204,7 +181,6 @@ List<Uri> libyuvSources(Uri libyuv) => _resolve(libyuv, 'source/', const [
   'rotate_argb.cc',
   'rotate_common.cc',
   'rotate_gcc.cc',
-  'rotate_win.cc',
   'row_any.cc',
   'row_common.cc',
   'row_gcc.cc',
@@ -214,28 +190,21 @@ List<Uri> libyuvSources(Uri libyuv) => _resolve(libyuv, 'source/', const [
   'scale_argb.cc',
   'scale_common.cc',
   'scale_gcc.cc',
-  'scale_rgb.cc',
   'scale_uv.cc',
   'scale_win.cc',
-  'video_common.cc',
 ]);
 
-/// libyuv NEON sources for 32-bit Arm.
 List<Uri> libyuvNeonSources(Uri libyuv) => _resolve(libyuv, 'source/', const [
-  'compare_neon.cc',
   'rotate_neon.cc',
   'row_neon.cc',
   'scale_neon.cc',
 ]);
 
-/// libyuv NEON sources for 64-bit Arm.
 List<Uri> libyuvNeon64Sources(Uri libyuv) => _resolve(libyuv, 'source/', const [
-  'compare_neon64.cc',
   'rotate_neon64.cc',
   'row_neon64.cc',
   'scale_neon64.cc',
 ]);
 
-/// libyuv SVE2 sources for 64-bit Arm.
 List<Uri> libyuvSveSources(Uri libyuv) =>
     _resolve(libyuv, 'source/', const ['row_sve.cc']);

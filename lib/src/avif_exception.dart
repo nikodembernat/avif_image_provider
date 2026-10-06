@@ -8,7 +8,7 @@ class const AvifDecodeException(
   /// Positive values are libavif `avifResult` codes.
   final int? code,
 }) implements Exception {
-  /// Creates an [AvifDecodeException].
+  /// Creates an exception with a human-readable [message].
   this;
 
   @override

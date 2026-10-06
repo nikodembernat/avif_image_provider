@@ -1,7 +1,3 @@
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 import 'dart:async';
 import 'dart:io' show File;
 import 'dart:ui' as ui;
@@ -15,7 +11,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'fixtures.dart';
 import 'test_utils.dart';
 
-/// Encodes a 2x1 PNG image: a red and a green pixel.
 Future<Uint8List> _png() async {
   final recorder = ui.PictureRecorder();
   ui.Canvas(recorder)
@@ -46,8 +41,6 @@ final class _FixtureBundle() extends CachingAssetBundle {
   }
 }
 
-/// Resolves [provider] and returns the first [ImageInfo], or throws the error
-/// reported by the image stream.
 Future<ImageInfo> _resolve(ImageProvider provider) {
   final completer = Completer<ImageInfo>();
   final stream = provider.resolve(ImageConfiguration.empty);
@@ -66,7 +59,6 @@ Future<ImageInfo> _resolve(ImageProvider provider) {
   return completer.future;
 }
 
-/// Waits until the [RawImage] in the tree has an image and returns it.
 Future<ui.Image> _waitForImage(WidgetTester tester) async {
   for (var i = 0; i < 500; i++) {
     final image = tester.widget<RawImage>(find.byType(RawImage)).image;

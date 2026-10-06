@@ -1,7 +1,3 @@
-// Copyright 2026 The avif_image_provider authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 import 'dart:async';
 import 'dart:io';
 
@@ -19,7 +15,7 @@ HttpClient get _httpClient {
   return client ?? _sharedHttpClient;
 }
 
-/// Downloads the image at [url], reporting progress to [chunkEvents].
+/// Downloads [url], reporting progress to [chunkEvents].
 Future<Uint8List> loadNetworkBytes(
   String url,
   Map<String, String>? headers,
@@ -30,7 +26,6 @@ Future<Uint8List> loadNetworkBytes(
   headers?.forEach(request.headers.add);
   final response = await request.close();
   if (response.statusCode != HttpStatus.ok) {
-    // The response body is not needed.
     await response.drain<List<int>>(<int>[]);
     throw NetworkImageLoadException(statusCode: response.statusCode, uri: uri);
   }
