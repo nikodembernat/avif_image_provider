@@ -1,0 +1,33 @@
+name: avif_image_provider
+description: >-
+  Fast AVIF image provider for Flutter with animation support. Decodes with
+  libavif + dav1d through FFI on native platforms and uses the browser's
+  built-in AVIF decoder on the web.
+version: 0.1.0
+repository: https://github.com/nikodembernat/avif_image_provider
+issue_tracker: https://github.com/nikodembernat/avif_image_provider/issues
+topics:
+  - avif
+  - image
+  - animation
+  - ffi
+  - image-provider
+
+environment:
+  sdk: ^3.13.0
+  flutter: ">=3.47.0"
+
+dependencies:
+  code_assets: ^2.1.0
+  ffi: ^2.2.0
+  flutter:
+    sdk: flutter
+  hooks: ^2.2.0
+  logging: ^1.3.0
+  native_toolchain_c: ^0.19.5
+
+dev_dependencies:
+  ffigen: ^23.0.0
+  flutter_test:
+    sdk: flutter
+  leancode_lint: ^27.0.0

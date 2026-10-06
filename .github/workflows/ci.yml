@@ -1,0 +1,204 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-flutter
+        with:
+          nasm: "false"
+      - run: flutter pub get
+      - run: (cd example && flutter pub get)
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test hook tool example/lib example/integration_test
+      - name: Analyze package
+        run: flutter analyze
+      - name: Analyze example
+        run: (cd example && flutter analyze)
+      - name: Check that the FFI bindings are up to date
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq libclang-dev
+          dart run tool/ffigen.dart
+          git diff --exit-code lib/src/ffi
+      - name: Validate the package
+        run: flutter pub publish --dry-run
+
+  test:
+    name: Unit tests (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            os: ubuntu-latest
+          - name: Linux x64, without SIMD
+            os: ubuntu-latest
+            nasm: "false"
+          - name: Linux Arm64
+            os: ubuntu-24.04-arm
+          - name: macOS Arm64
+            os: macos-latest
+          - name: Windows x64
+            os: windows-latest
+          - name: Windows Arm64
+            os: windows-11-arm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-flutter
+        with:
+          nasm: ${{ matrix.nasm || 'true' }}
+      - run: flutter test -r expanded
+
+  test-web:
+    name: Unit tests (Chrome, ${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [dart2js, dart2wasm]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-flutter
+        with:
+          nasm: "false"
+      - uses: browser-actions/setup-chrome@v2
+        id: chrome
+      - run: flutter test --platform chrome ${{ matrix.compiler == 'dart2wasm' && '--wasm' || '' }} -r expanded
+        env:
+          CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
+
+  integration-desktop:
+    name: Integration tests (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-latest
+            device: linux
+          - name: macOS
+            os: macos-latest
+            device: macos
+          - name: Windows
+            os: windows-latest
+            device: windows
+    defaults:
+      run:
+        working-directory: example
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-flutter
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y -qq ninja-build libgtk-3-dev xvfb
+      - name: Run integration tests
+        if: runner.os == 'Linux'
+        run: xvfb-run -a flutter test integration_test -d linux -r expanded
+      - name: Run integration tests
+        if: runner.os != 'Linux'
+        run: flutter test integration_test -d ${{ matrix.device }} -r expanded
+
+  integration-android:
+    name: Integration tests (Android)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: example
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: ./.github/actions/setup-flutter
+      - name: Build the release APK (arm, arm64, x64)
+        run: flutter build apk --release
+      - name: Check the native libraries in the APK
+        run: |
+          unzip -l build/app/outputs/flutter-apk/app-release.apk | grep libavif_image_provider.so | tee libs.txt
+          test "$(wc -l < libs.txt)" -eq 3
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run integration tests on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          working-directory: example
+          script: flutter test integration_test -d emulator-5554 -r expanded
+
+  integration-ios:
+    name: Integration tests (iOS simulator)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: example
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-flutter
+      - name: Boot a simulator
+        run: |
+          UDID=$(xcrun simctl list devices available --json \
+            | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))] | last | .udid')
+          echo "Using simulator $UDID"
+          xcrun simctl boot "$UDID"
+          echo "SIMULATOR=$UDID" >> "$GITHUB_ENV"
+      - name: Run integration tests
+        run: flutter test integration_test -d "$SIMULATOR" -r expanded
+      - name: Build for iOS devices
+        run: flutter build ios --release --no-codesign
+
+  integration-web:
+    name: Integration tests (Chrome, ${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [dart2js, dart2wasm]
+    defaults:
+      run:
+        working-directory: example
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-flutter
+        with:
+          nasm: "false"
+      - uses: browser-actions/setup-chrome@v2
+        id: chrome
+        with:
+          install-chromedriver: true
+      - name: Start ChromeDriver
+        run: |
+          "${{ steps.chrome.outputs.chromedriver-path }}" --port=4444 &
+          sleep 2
+      - name: Run integration tests
+        run: >-
+          flutter drive
+          --driver=test_driver/integration_test.dart
+          --target=integration_test/avif_image_provider_test.dart
+          -d web-server --browser-name=chrome
+          ${{ matrix.compiler == 'dart2wasm' && '--wasm' || '' }}
+        env:
+          CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
+      - name: Build the web app
+        run: flutter build web ${{ matrix.compiler == 'dart2wasm' && '--wasm' || '' }}

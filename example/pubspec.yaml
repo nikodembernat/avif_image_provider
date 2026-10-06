@@ -1,0 +1,28 @@
+name: avif_image_provider_example
+description: Demonstrates how to use the avif_image_provider package.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  avif_image_provider:
+    path: ../
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  leancode_lint: ^27.0.0
+
+flutter:
+  uses-material-design: true
+  config:
+    # No CocoaPods: iOS and macOS use Swift Package Manager.
+    enable-swift-package-manager: true
+  assets:
+    - assets/

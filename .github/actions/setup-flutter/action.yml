@@ -1,0 +1,50 @@
+name: Set up Flutter
+description: >-
+  Installs the latest stable Flutter SDK (and nasm, used to build dav1d's x86
+  SIMD assembly) on any runner, including Arm64 Linux and Windows.
+
+inputs:
+  nasm:
+    description: Whether to install nasm.
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Install Flutter (x64 and macOS)
+      if: runner.arch != 'ARM64' || runner.os == 'macOS'
+      uses: subosito/flutter-action@v2
+      with:
+        channel: stable
+        cache: true
+
+    # There are no prebuilt Flutter SDK archives for Arm64 Linux and Windows;
+    # a git checkout downloads the right artifacts for the host.
+    - name: Install Flutter (Arm64 Linux and Windows)
+      if: runner.arch == 'ARM64' && runner.os != 'macOS'
+      shell: bash
+      run: |
+        git clone --depth 1 --branch stable https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+        echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+
+    - name: Install nasm (Linux)
+      if: inputs.nasm == 'true' && runner.os == 'Linux' && runner.arch == 'X64'
+      shell: bash
+      run: sudo apt-get update -qq && sudo apt-get install -y -qq nasm
+
+    - name: Install nasm (macOS)
+      if: inputs.nasm == 'true' && runner.os == 'macOS'
+      shell: bash
+      run: brew install nasm
+
+    # Installed to C:\Program Files\NASM, which the build hook also searches.
+    - name: Install nasm (Windows)
+      if: inputs.nasm == 'true' && runner.os == 'Windows' && runner.arch == 'X64'
+      shell: pwsh
+      run: choco install nasm --no-progress -y
+
+    - name: Show versions
+      shell: bash
+      run: |
+        flutter --version
+        command -v nasm && nasm -v || echo "nasm not on PATH"

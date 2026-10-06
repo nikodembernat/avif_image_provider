@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+# Copyright 2026 The avif_image_provider authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+"""Generates the AVIF fixtures used by the tests and the example app.
+
+Requires Pillow 11.3 or newer (with AVIF support):
+
+    python3 -m venv .venv && .venv/bin/pip install pillow
+    .venv/bin/python tool/generate_test_images.py
+"""
+
+import base64
+import math
+import os
+import shutil
+
+from PIL import Image
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FIXTURES = os.path.join(ROOT, "test", "fixtures")
+EXAMPLE_ASSETS = os.path.join(ROOT, "example", "assets")
+
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+WHITE = (255, 255, 255)
+
+LOSSLESS = {"quality": 100, "subsampling": "4:4:4", "speed": 6}
+
+
+def quadrants(width, height):
+    """Red top-left, green top-right, blue bottom-left, white bottom-right."""
+    image = Image.new("RGB", (width, height))
+    pixels = image.load()
+    for y in range(height):
+        for x in range(width):
+            left = x < width // 2
+            top = y < height // 2
+            pixels[x, y] = (
+                RED if top and left else GREEN if top else BLUE if left else WHITE
+            )
+    return image
+
+
+def save(image, name, **options):
+    path = os.path.join(FIXTURES, name)
+    image.save(path, "AVIF", **options)
+    print(f"{name}: {os.path.getsize(path)} bytes")
+
+
+def set_repetition_count(path, count):
+    """Makes an animation play `count + 1` times.
+
+    Pillow always writes animations that loop forever (an indefinite track
+    duration). The number of plays is the track duration divided by the
+    duration of the (repeated) edit list, so the track headers are patched.
+    """
+    with open(path, "rb") as file:
+        data = bytearray(file.read())
+    segment = data.find(b"elst")
+    assert segment > 0 and data[segment + 4] == 1, "expected a version 1 elst"
+    # version/flags (4), entry_count (4), segment_duration (8).
+    segment_duration = int.from_bytes(data[segment + 12 : segment + 20], "big")
+    duration = segment_duration * (count + 1)
+    start = 0
+    while (tkhd := data.find(b"tkhd", start)) > 0:
+        start = tkhd + 4
+        if data[tkhd + 4] == 1:
+            # version/flags (4), creation (8), modification (8), id (4),
+            # reserved (4), duration (8).
+            offset = tkhd + 4 + 28
+            data[offset : offset + 8] = duration.to_bytes(8, "big")
+        else:
+            offset = tkhd + 4 + 20
+            data[offset : offset + 4] = duration.to_bytes(4, "big")
+    with open(path, "wb") as file:
+        file.write(data)
+
+
+def fixtures():
+    os.makedirs(FIXTURES, exist_ok=True)
+
+    # A 64x48 still image with four solid quadrants.
+    save(quadrants(64, 48), "quadrants_444.avif", **LOSSLESS)
+    save(quadrants(64, 48), "quadrants_420.avif", quality=90, subsampling="4:2:0")
+
+    # A 200x100 image used to test decoding at a smaller size.
+    save(quadrants(200, 100), "quadrants_200x100.avif", **LOSSLESS)
+
+    # 32x32: left half opaque red, right half blue at 50% opacity.
+    alpha = Image.new("RGBA", (32, 32))
+    pixels = alpha.load()
+    for y in range(32):
+        for x in range(32):
+            pixels[x, y] = (255, 0, 0, 255) if x < 16 else (0, 0, 255, 128)
+    save(alpha, "alpha.avif", **LOSSLESS)
+
+    # 64x48 quadrants with EXIF orientation 6 (rotate 90 degrees clockwise),
+    # which the encoder stores as an `irot` property. Displayed as 48x64 with
+    # blue top-left, red top-right, white bottom-left, green bottom-right.
+    rotated = quadrants(64, 48)
+    exif = rotated.getexif()
+    exif[0x0112] = 6
+    save(rotated, "rotated.avif", exif=exif, **LOSSLESS)
+
+    # 16x16 animation: red (100 ms), green (200 ms), blue (300 ms), looping
+    # forever.
+    frames = [Image.new("RGB", (16, 16), color) for color in (RED, GREEN, BLUE)]
+    save(
+        frames[0],
+        "animated.avif",
+        save_all=True,
+        append_images=frames[1:],
+        duration=[100, 200, 300],
+        loop=0,
+        **LOSSLESS,
+    )
+
+    # The same animation with transparency, played twice.
+    frames = [
+        Image.new("RGBA", (16, 16), color + (128,)) for color in (RED, GREEN)
+    ]
+    save(
+        frames[0],
+        "animated_alpha_loop1.avif",
+        save_all=True,
+        append_images=frames[1:],
+        duration=[50, 50],
+        **LOSSLESS,
+    )
+    set_repetition_count(os.path.join(FIXTURES, "animated_alpha_loop1.avif"), 1)
+
+    # test/fixtures/colors-animated-12bpc-keyframes-0-2-3.avif is a 12-bit
+    # animation from the libavif test data (same license as libavif).
+
+    # Not an AVIF file.
+    with open(os.path.join(FIXTURES, "not_avif.avif"), "wb") as file:
+        file.write(b"\x00\x00\x00\x18ftypjunk" + b"\x00" * 64)
+
+
+def dart_fixtures():
+    """Embeds the fixtures in a Dart file, so tests can also run on the web."""
+    lines = [
+        "// Copyright 2026 The avif_image_provider authors. All rights reserved.",
+        "// Use of this source code is governed by a BSD-style license that can be",
+        "// found in the LICENSE file.",
+        "",
+        "// Generated by tool/generate_test_images.py. Do not edit.",
+        "",
+        "import 'dart:convert';",
+        "import 'dart:typed_data';",
+        "",
+        "/// The AVIF test fixtures, by file name.",
+        "final Map<String, Uint8List> fixtures = {",
+    ]
+    for name in sorted(os.listdir(FIXTURES)):
+        with open(os.path.join(FIXTURES, name), "rb") as file:
+            data = base64.b64encode(file.read()).decode("ascii")
+        lines.append(f"  '{name}': base64Decode(")
+        for i in range(0, len(data), 72):
+            lines.append(f"    '{data[i:i + 72]}'")
+        lines.append("  ),")
+    lines.append("};")
+    with open(os.path.join(ROOT, "test", "fixtures.dart"), "w") as file:
+        file.write("\n".join(lines) + "\n")
+
+
+def plasma(width, height, t):
+    image = Image.new("RGB", (width, height))
+    pixels = image.load()
+    for y in range(height):
+        for x in range(width):
+            u = x / width * 2 * math.pi
+            v = y / height * 2 * math.pi
+            value = (
+                math.sin(u * 2 + t)
+                + math.sin(v * 3 - t)
+                + math.sin((u + v) * 1.5 + t * 0.5)
+                + math.sin(math.hypot(u - math.pi, v - math.pi) * 2 - t)
+            )
+            pixels[x, y] = (
+                int(128 + 127 * math.sin(value * math.pi / 2)),
+                int(128 + 127 * math.sin(value * math.pi / 2 + 2 * math.pi / 3)),
+                int(128 + 127 * math.sin(value * math.pi / 2 + 4 * math.pi / 3)),
+            )
+    return image
+
+
+def example_assets():
+    os.makedirs(EXAMPLE_ASSETS, exist_ok=True)
+    still = plasma(512, 512, 0.0)
+    still.save(os.path.join(EXAMPLE_ASSETS, "plasma.avif"), "AVIF", quality=80)
+
+    frames = [plasma(256, 256, i * 2 * math.pi / 48) for i in range(48)]
+    frames[0].save(
+        os.path.join(EXAMPLE_ASSETS, "plasma_animated.avif"),
+        "AVIF",
+        save_all=True,
+        append_images=frames[1:],
+        duration=40,
+        loop=0,
+        quality=70,
+    )
+    for name in ("animated.avif", "alpha.avif", "quadrants_444.avif"):
+        shutil.copy(os.path.join(FIXTURES, name), EXAMPLE_ASSETS)
+    for name in sorted(os.listdir(EXAMPLE_ASSETS)):
+        size = os.path.getsize(os.path.join(EXAMPLE_ASSETS, name))
+        print(f"example/assets/{name}: {size} bytes")
+
+
+if __name__ == "__main__":
+    fixtures()
+    dart_fixtures()
+    example_assets()
