@@ -118,25 +118,29 @@ void main() {
 
   testWidgets('example app shows all local images', (tester) async {
     await tester.pumpWidget(const AvifExampleApp());
-    final images = find.byType(RawImage);
-    // Wait for the asset images (the first four examples) to be decoded.
-    for (var i = 0; i < 100; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-      final decoded = tester
-          .widgetList<RawImage>(images)
-          .where((image) => image.image != null)
-          .length;
-      if (decoded >= 4) {
-        break;
+    // The grid is lazy, so each example is scrolled into view before its
+    // image is checked.
+    const expectedSizes = {
+      'Still image': (512, 512),
+      'Animated image': (256, 256),
+      'Transparency': (32, 32),
+      'Decoded at 64 px (cacheWidth)': (64, 64),
+    };
+    for (final MapEntry(key: title, value: size) in expectedSizes.entries) {
+      final label = find.text(title);
+      await tester.scrollUntilVisible(label, 100);
+      final image = find.descendant(
+        of: find.ancestor(of: label, matching: find.byType(Card)),
+        matching: find.byType(RawImage),
+      );
+      ui.Image? decoded;
+      for (var i = 0; i < 100 && decoded == null; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        decoded = tester.widget<RawImage>(image).image;
       }
+      expect(decoded, isNotNull, reason: title);
+      expect((decoded!.width, decoded.height), size, reason: title);
     }
-    final decoded = tester
-        .widgetList<RawImage>(images)
-        .map((image) => image.image)
-        .nonNulls
-        .map((image) => (image.width, image.height))
-        .toList();
-    expect(decoded, containsAll([(512, 512), (256, 256), (32, 32), (64, 64)]));
     expect(find.byType(ErrorWidget), findsNothing);
   });
 }
