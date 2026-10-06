@@ -136,7 +136,9 @@ void main() {
       ui.Image? decoded;
       for (var i = 0; i < 100 && decoded == null; i++) {
         await tester.pump(const Duration(milliseconds: 100));
-        decoded = tester.widget<RawImage>(image).image;
+        // Until the first frame is decoded, the example shows a progress
+        // indicator instead of the image.
+        decoded = tester.widgetList<RawImage>(image).firstOrNull?.image;
       }
       expect(decoded, isNotNull, reason: title);
       expect((decoded!.width, decoded.height), size, reason: title);
