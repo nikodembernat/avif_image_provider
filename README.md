@@ -143,8 +143,8 @@ hooks:
       jobs: 4
 ```
 
-The `NASM` environment variable can also be used to point to nasm. The
-library is rebuilt automatically when nasm is installed later.
+The `NASM` environment variable can also be used to point to nasm. After
+installing nasm, run `flutter clean` so the library is built again with it.
 
 ## Development
 

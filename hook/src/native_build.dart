@@ -198,9 +198,13 @@ class NativeBuild({
       if (Platform.isLinux) '/usr/bin/nasm',
     ]);
 
-    // Installing (or updating) nasm later must trigger a rebuild, so every
-    // location that was looked at is a dependency, whether it exists or not.
-    _nasmCandidates.addAll(candidates.map(Uri.file));
+    // Updating a nasm that exists rebuilds the library. A location without
+    // one is not a dependency: the hooks runner counts a missing file as
+    // changed during every build, which then rebuilt the library each time.
+    _nasmCandidates.addAll([
+      for (final candidate in candidates)
+        if (File(candidate).existsSync()) Uri.file(candidate),
+    ]);
     for (final candidate in candidates) {
       final file = File(candidate);
       if (!file.existsSync()) {
