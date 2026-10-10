@@ -209,6 +209,7 @@ jobs:
           --driver=test_driver/integration_test.dart
           --target=integration_test/avif_image_provider_test.dart
           -d web-server --browser-name=chrome
+          --chrome-binary="${{ steps.chrome.outputs.chrome-path }}"
           ${{ matrix.compiler == 'dart2wasm' && '--wasm' || '' }}
         env:
           CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
